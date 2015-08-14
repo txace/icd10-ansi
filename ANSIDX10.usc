@@ -1,0 +1,283 @@
+start ANSIDX10(ansival,ansirec,ansifld,ansitest,ansicl,ansicon,ansiprov)
+ %VERSION 0.1.000 08/14/2015
+ 'Author:  R. Whaite, Helen Farbaee Centers
+ 
+ 'Dependencies
+ 
+ '1.	Recode Table RU2DXTYP - This recode table recodes the RU to either MH, SA or IDD (and optionally "PH" - Physical Health).  
+ '		This value is used by the script to determien what type of DX needs to be selected by the script and handed back to the ANSIP 
+ '		process.
+ 
+ '2.	Libraries and Functions
+ '		a.	the GetClientDX function lib_DX10 is used and returns arrays containing the dx_type, icd9_code, icd10_code
+ 
+ 'ToDo:
+ 
+ '1.	Do we want to provide options for recoding event FS and event SAC to MH, SA or IDD?  Should be easy enough to do if 
+ '    this functinality is desied.
+ '
+ '2.	Still have to develop the process to look at the old ICD-9 record.  However, this will likly be a bit different for each Center.
+ '
+ '3.	Get Tim to put his GetOption and GetParm stuff in here so we can drive more stuff from a parm.  Then I can add it to an include ;-)
+
+ 
+%include inc_DX10
+
+'ANSIP Vars
+ansival  is x
+ansirec  is x
+ansifld  is x
+ansitest is x
+ansicl   is x
+ansicon  is x
+ansiprov is x
+
+'Logging and Trace - Typically needed for testing.  Comment out if no longer needed.  Filesystem location and filename will need to be
+'               Specific per Center.  Note, for tracing to provide useful feedback while testing, the ANSI process should only be 
+'								run for one client and one event at a time.  Otherwise the trace file keeps over-writing itself.  However, the 
+'								logfile will record the action on each event put into the ANSI Process
+
+|         is x   | = "|"
+ansiorig  is x
+logfile   is x  logfile = "/c4/EXPORT2/trace/ANSIDX10.LOG"
+logstring is x
+$trace("path", "/c4/EXPORT2/trace/ANSIDX10.TXT")
+$trace("on")
+
+'Processing Vars
+rc       is b
+'***************************************************************************************************************************
+dx10date is d dx10date = 08/10/2015		'*******Change to 10/01/2015 for production.  Any other date is ONLY for testing******.
+'***************************************************************************************************************************
+rtdxtype	is x
+icd_ver	  is x
+usedx     is x
+rurecode  is x  rurecode = "RU2DXTYP"  'Change to match your RU to DX Type Recode
+
+'ISN DST's & Vars
+$$isn.id			is x	
+$$isn.clid 		is x
+$$isn.dt			is d
+$$isn.sac			is b
+$$isn.ru			is b
+$$isn.fs			is b
+
+'Client DST's & Vars
+
+
+ansiorig = ansival			'Grap the original ansival value and keep it for comparison purposes.  Should be the ISN ID for the event
+
+$allowupdate(ansival)
+$silent(ansival)
+
+'Identify the Record and Field from the ANSI parm
+if    ansirec = "102" and ansifld = "001"
+
+'Get the details of the event from the ISN ID associaed witht he event.
+rc = $dbread(09,ansiorig,$$isn.clid,$$isn.dt,$$isn.sac,$$isn.ru,$$isn.fs)
+
+	rtdxtype = $rt($$isn.ru,rurecode,"R")					'Get the DX Type (MH, IDD, SA) by looking by recoding event RU
+
+'	icd10recavail($$isn.clid)													'Is there an ICD-10 Record Available"
+
+	if $$isn.dt < dx10date													'Determine if where we should get the DX (ICD-9 or ICD-10 record and if we should return
+		icd_ver = "9"																'the ICD-9 value (before ICD-10 date) or the ICD-10 Value
+	else
+		icd_ver = "10"
+	endif
+
+		if 			icd_ver = "10"
+			usedx = getDXfrom10($$isn.clid,icd_ver,rtdxtype)
+		elseif 	icd10recavail($$isn.clid) = "Y" and icd_ver = "9"
+			usedx = getDXfrom10($$isn.clid,icd_ver,rtdxtype)
+		elseif 	icd10recavail($$isn.clid) = "N" and icd_ver = "9"
+			usedx = getDXfrom9($$isn.clid,icd_ver,rtdxtype)							'Still need to build getDXfrom9 function
+		endif
+
+endif
+
+ansival = usedx
+
+logstring = "ENTITY" + | + rc + | + ansiorig + | + ansirec + | + ansifld + | + ansicl + | + ansicon + | + ansival
+
+$log(logstring,logfile)
+$trace("off")
+end ANSIDX10
+
+function icd10recavail(cid) is x
+
+rc	is i
+cid is x
+'c.dx10.rh		is h
+'c.dx10.dt		is d
+
+rc = $dbread(02,cid,dx10_dstlist)
+
+if c.dx10.dt dp
+	icd10recavail = "Y"
+ERRLINE 0117*-> VARIABLE '10RECAVAIL' NOT DEFINED IN TYPE STATEMENT
+else
+	icd10recavail = "N"
+ERRLINE 0119*-> VARIABLE '10RECAVAIL' NOT DEFINED IN TYPE STATEMENT
+endif
+
+end icd10recavail
+
+
+function GETDXFROM10(cid,icd_ver,rtdxtype) is x
+
+cid          is x
+rtdxtype     is x
+icd_ver      is x
+
+as_of_date   is x
+dx_rec       is h
+dx_date      is d
+dx_time      is t
+dx_primary   is x
+dx_reason    is x
+dx10_code[]  is x
+dx_rank[]    is x
+dx_axis[]    is x
+dx9_code[]   is x
+dx_cat[]     is x
+
+arr_index    is i
+
+DX_TP				 is x
+DX_PP				 is x
+DX_IP				 is x
+DX_SA				 is x
+DX_ID				 is x
+DX_PH				 is x
+
+
+'Get the arrays of dx10 codes, dx9 codes and dx categories.
+{"lib_DX10"}getClientDx(cid,,,,,,, dx10_code[],,,, dx9_code[], dx_cat[])
+
+'Find Target Population and set the variable TX_TP
+$clear(arr_index)
+arr_index = $find("TP_",dx_cat[],,"P") 
+	if arr_index > 0
+		select icd_ver
+			case "10"
+				DX_TP = dx10_code[arr_index]
+			case "9"
+				DX_TP = dx10_code[arr_index]
+		endselect
+	else
+		$clear(DX_TP)
+	endif
+
+'Find Priority Population and set the variable TX_PP
+$clear(arr_index)
+arr_index = $find("PP",dx_cat[],,"F")
+	if arr_index > 0
+		select icd_ver
+			case "10"
+				DX_PP = dx10_code[arr_index]
+			case "9"
+				DX_PP = dx10_code[arr_index]
+		endselect
+	else
+		$clear(DX_PP)
+	endif
+
+'Find Ineligible Population and set the variable TX_IP
+$clear(arr_index)
+arr_index = $find("IP",dx_cat[],,"F")
+	if arr_index > 0
+		select icd_ver
+			case "10"
+				DX_IP = dx10_code[arr_index]
+			case "9"
+				DX_IP = dx10_code[arr_index]
+		endselect
+	else
+		$clear(DX_IP)
+	endif
+
+'Find Substance Abuse and set the variable TX_SA
+$clear(arr_index)
+arr_index = $find("SA",dx_cat[],,"F")
+	if arr_index > 0
+		select icd_ver
+			case "10"
+				DX_SA = dx10_code[arr_index]
+			case "9"
+				DX_SA = dx10_code[arr_index]
+		endselect
+	else
+		$clear(DX_SA)
+	endif
+
+'Find Intellectual Disability and set the variable TX_ID
+$clear(arr_index)
+arr_index = $find("ID",dx_cat[],,"F")
+	if arr_index > 0
+		select icd_ver
+			case "10"
+				DX_ID = dx10_code[arr_index]
+			case "9"
+				DX_ID = dx10_code[arr_index]
+		endselect
+	else
+		$clear(DX_ID)
+	endif
+
+'Find Physical Health and set the variable TX_PH
+$clear(arr_index)
+arr_index = $find("PH",dx_cat[],,"F")
+	if arr_index > 0
+		select icd_ver
+			case "10"
+				DX_PH = dx10_code[arr_index]
+			case "9"
+				DX_PH = dx10_code[arr_index]
+		endselect
+	else
+		$clear(DX_PH)
+	endif
+
+'Determine which DX to the function returns to the script
+select rtdxtype
+	case "MH"
+		if     DX_TP dp
+			getdxfrom10 = DX_TP
+		elseif DX_PP dp
+			getdxfrom10 = DX_PP
+		elseif DX_PP dp
+			getdxfrom10 = DX_PP
+		else
+			$clear(getdxfrom10)
+		endif
+	case "SA"
+		if DX_SA dp
+			getdxfrom10 = DX_SA
+		else
+			$clear(getdxfrom10)
+		endif
+	case "IDD"
+		if DX_ID dp
+			getdxfrom10 = DX_ID
+		else
+			$clear(getdxfrom10)
+		endif
+	case "PH"
+		if DX_PH dp
+			getdxfrom10 = DX_PH
+		else
+			$clear(getdxfrom10)
+		endif
+endselect
+
+end GETDXFROM10
+
+
+function GETDXFROM9() is x
+
+'Work in progress
+
+end GETDXFROM9
+
+
