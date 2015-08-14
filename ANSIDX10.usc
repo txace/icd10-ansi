@@ -75,7 +75,6 @@ if    ansirec = "102" and (ansifld = "001" or ansifld = "013")
 
 'Get the details of the event from the ISN ID associaed witht he event.
 rc = $dbread(09,ansiorig,$$isn.clid,$$isn.dt,$$isn.sac,$$isn.ru,$$isn.fs)
-ERRLINE 0077*-> UNBALANCED PARENTHESES
 
 	rtdxtype = $rt($$isn.ru,rurecode,"R")					'Get the DX Type (MH, IDD, SA) by looking by recoding event RU
 
