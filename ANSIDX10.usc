@@ -109,8 +109,6 @@ rc = $dbread(09,ansiorig,$$isn.clid,$$isn.dt,$$isn.sac,$$isn.ru,$$isn.fs)
 	endif
 endif
 
-ansival = usedx
-
 logstring = "ENTITY" + | + rc + | + ansiorig + | + ansirec + | + ansifld + | + ansicl + | + ansicon + | + ansival
 
 $log(logstring,logfile)
