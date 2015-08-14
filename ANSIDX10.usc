@@ -71,10 +71,11 @@ $allowupdate(ansival)
 $silent(ansival)
 
 'Identify the Record and Field from the ANSI parm
-if    ansirec = "102" and ansifld = "001"
+if    ansirec = "102" and (ansifld = "001" or ansifld = "013")
 
 'Get the details of the event from the ISN ID associaed witht he event.
 rc = $dbread(09,ansiorig,$$isn.clid,$$isn.dt,$$isn.sac,$$isn.ru,$$isn.fs)
+ERRLINE 0077*-> UNBALANCED PARENTHESES
 
 	rtdxtype = $rt($$isn.ru,rurecode,"R")					'Get the DX Type (MH, IDD, SA) by looking by recoding event RU
 
@@ -86,6 +87,16 @@ rc = $dbread(09,ansiorig,$$isn.clid,$$isn.dt,$$isn.sac,$$isn.ru,$$isn.fs)
 		icd_ver = "10"
 	endif
 
+	if ansifld = "013"														'This will handle sending BK for ICD-9 and ABK for ICD-10 when called from field 13 (record 102)
+		select icd_ver
+			case "9"
+				ansival = "BK"
+			case "10" 
+				ansival = "ABK"
+		endselect	
+	
+	else
+
 		if 			icd_ver = "10"
 			usedx = getDXfrom10($$isn.clid,icd_ver,rtdxtype)
 		elseif 	icd10recavail($$isn.clid) = "Y" and icd_ver = "9"
@@ -94,6 +105,9 @@ rc = $dbread(09,ansiorig,$$isn.clid,$$isn.dt,$$isn.sac,$$isn.ru,$$isn.fs)
 			usedx = getDXfrom9($$isn.clid,icd_ver,rtdxtype)							'Still need to build getDXfrom9 function
 		endif
 
+	ansival = usedx
+	
+	endif
 endif
 
 ansival = usedx
@@ -115,10 +129,8 @@ rc = $dbread(02,cid,dx10_dstlist)
 
 if c.dx10.dt dp
 	icd10recavail = "Y"
-ERRLINE 0117*-> VARIABLE '10RECAVAIL' NOT DEFINED IN TYPE STATEMENT
 else
 	icd10recavail = "N"
-ERRLINE 0119*-> VARIABLE '10RECAVAIL' NOT DEFINED IN TYPE STATEMENT
 endif
 
 end icd10recavail
