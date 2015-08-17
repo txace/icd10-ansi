@@ -1,0 +1,154 @@
+start AnsiWrap()
+
+'Author:  R. Whaite
+'Create Date:  8/16/2011
+'
+'Modified:  Bob Bell, 8/18/2011
+'		Misc stuff to make it run better and to not have to assign values to as many variables.  the idea was to 
+'		eventually make this as portable as possible.
+'
+'Modified:  Ralph Whaite, 8/17/2015
+'		Removed checking for the value of "*VERSION" in the parm file to determine 5010 or 4010.  In 2015, everything is 5010
+
+'This script will check to make sure specific bill files are not present before allowing the billing process
+'for a particular fund sournce to be run.  This will prevent a subsequently run billing process from replacing
+'a production bill file with another file of the same name before the file has been submitted and archived.
+'
+'This script relies on the BillParm name being placed in the Add Parm1 menu item.  It uses this ParmFile name to get the file
+'name to check.
+
+'It also dynamically creates the ANSI 837 parmfile tells the ANSI process to process as version 5010
+
+'Lastly, if any special file edits need to be completed on the file before submission (ie: Texas LTC TypeAB KX Modifer)
+'A UNIX Command can be defined that will make those changes to the file.  Otherwise, do not set a value for the 
+'variable "FixCMD"
+
+$trace("path","/c4/EXPORT2/trace/AnsiWrap.txt")
+$trace("on")
+
+'Define the parameters we'll need.
+
+win1		     is b	'Window Handle number
+rc		       is i	'Function return codes
+CreateBill	 is b	'Error code from $misprog
+FileName	   is x	'Name of output file
+CheckFile	   is x	'Output file name & path
+FilePath	   is x	'path to output file
+FileSize	   is n
+FileCreateDT is d
+FileCreateTM is t
+FileOwner	   is x
+BillParm	   is x
+FixCMD		   is x	'Unix command for fixing output file
+Version		   is x	'5010 or 4010
+ParmArray[]	 is x	'Array for building a parameter file
+VerParm		   is x	'Parameter file name
+bill_parm    is x  'Billing Parm file to use selected from either $adparm1 or $adparm2
+
+
+'Check to make sure the Add Parm 1 menu item has something there.  If not, give the error message and terminate the script.
+if $adparm1  !DP
+	ShowMessageWin("Please Add Billing Parm File to Add Parm 1",,"Print this Screen and Contact MIS")
+	return
+endif
+
+'Check that the Add Parm 1 value is something we expect.  If not, give the error message and terminate the script.
+'This section also uses the Parm 1 value to determine the expected file name and the expected path
+
+bill_parm = $adparm1
+
+'check the billing parm file for the parameter "SEQOUT", if it is present, put the value into the CheckFile variable.
+'We should probably do some error checking to handle situations when the SEQOUT parmaeter is not present.  If this is the case, 
+'The process should notify the user and then abort (return).
+
+rc = $getparm(,bill_parm, "SEQOUT", CheckFile)
+
+if rc >= 2
+	ShowMessageWin("SEQOUT Parm Not in Parmfile",,"Print this Screen and Contact MIS")
+	return
+endif
+
+' Use the filename from the parameter file if not overritten in this script.
+if CheckFile DP and FileName !DP then
+	FileName = CheckFile
+else
+	CheckFile = FileName
+	FileName = FilePath + FileName
+endif
+
+'Check to see if the file is there.  If it is, give the error message and terminate the script.
+'If it is not, allow the 837P proess to continue with the parm in Add Parm 1.
+
+rc = $checkfile(FileName,FileSize,FileCreateDT,FileCreateTM,,,FileOwner)
+
+if rc = 0                 'If the file already exists, issue the error message and instructions to the user
+	$openwin(win1, 5, 25, 4, 64)
+	$disp("Script ID:", 6, 5,,"H")
+	$disp($scriptid,    6,16,,)
+	$disp(`"FILE REPLACEMENT ERROR, " + CheckFile + " File Exists!"`, 7, 5,,"H")
+	$disp(`"File Size:  " + FileSize + " bytes"`, 9, 5,,"H")
+	$disp(`"File Date:  " + FileCreateDT`, 10, 5,,"H")
+	$disp(`"File Time:  " + FileCreateTM`, 11, 5,,"H")
+	$disp(`"File Owner: " + FileOwner`, 12, 5,,"H")
+	$disp("Print this Screen and Contact MIS", 19, 5,,"H")
+	$acpt()
+                
+                'If the billfile is not there, go ahead and dynamically create the bill parm that tells the process to run as
+                '5010 or 4010
+
+elseif rc = 1
+
+		ParmArray[1] = "NSA837P5"
+		ParmArray[2] = "NSA837P5PARM " + bill_parm
+		VerParm = "VP5010"
+
+	rc = $putparm(ParmArray[],VerParm,"R")
+
+	CreateBill = $misprog(474,VerParm)
+	if CreateBill = 0 then
+		' Have a post fix command to run
+		if FixCMD DP then
+			' Fix the output file name
+			FixCmd = $replace("%FILENAME%", Filename, FixCMD)
+			rc = $unix(FixCmd)
+		endif
+	else
+		' Show a error message
+		select CreateBill
+		  case 1	$errmsg1 = "The mis-prog-ref isn't in the program control file"
+		  case 2	$errmsg1 = "Operator isn't authorized to initiate this program"
+		  case 3 	$errmsg1 = "This function isn't permitted if $sessiontabs is active"
+		  case 4	$errmsg1 = "The program attempted is not allowed in $misprog (e.g. menu)"
+		  case 5 	$errmsg1 = "$misprog cannot be executed while $setmis is in effect"
+		  case 6 	$errmsg1 = "Program is browser only and session is in character mode"
+		  case 7 	$errmsg1 = "Program is non-browser mode and session is in browser mode"
+		  case 8	$errmsg1 = "Error bidding the CMHC/MIS program"
+		  case 9	$errmsg1 = "Program control file error"
+		  case 10	$errmsg1 = "The session is a CRON, but the requested CMHC/MIS program cannot be run in CRON mode"
+		  case 11	$errmsg1 = "More than one left-frame menu referenced"
+		  case other	$errmsg1 = $format(rc, "Unknown error (99)")
+		endselect
+	endif
+endif
+
+end AnsiWrap
+
+function ShowMessageWin(msg1, msg2, msg3, msg4) is null
+'--- function arguments ---
+msg1		is x	' Message line one
+msg2		is x	' Message line two
+msg3		is x	' Message line three
+msg4		is x 	' Message line four
+' --- Local Variables ---
+win1		is b	' Window Number
+'------------------------
+$openwin(win1, 5, 12, 4, 64)
+$disp("Script ID:", 6,  6,,"H")
+$disp($scriptid,    6, 17,,)
+$disp(msg1,  8, 6,,"H")
+$disp(msg2,  9, 6,,"H")
+$disp(msg3, 10, 6,,"H")
+$disp(msg4, 11, 6,,"H")
+$acpt()
+end ShowMessageWin
+
