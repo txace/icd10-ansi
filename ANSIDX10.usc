@@ -170,7 +170,7 @@ DX_PH				 is x
 
 
 'Get the arrays of dx10 codes, dx9 codes and dx categories.
-{"lib_DX10"}getClientDx(cid,,,,,,, dx10_code[],,,, dx9_code[], dx_cat[])
+{"lib_DX10"}getClientDx(cid,,,,,,, dx10_code[],,, dx9_code[],, dx_cat[])
 
 'Find Target Population and set the variable TX_TP
 $clear(arr_index)
@@ -180,7 +180,7 @@ arr_index = $find("TP_",dx_cat[],,"P")
 			case "10"
 				DX_TP = dx10_code[arr_index]
 			case "9"
-				DX_TP = dx10_code[arr_index]
+				DX_TP = dx9_code[arr_index]
 		endselect
 	else
 		$clear(DX_TP)
@@ -194,7 +194,7 @@ arr_index = $find("PP",dx_cat[],,"F")
 			case "10"
 				DX_PP = dx10_code[arr_index]
 			case "9"
-				DX_PP = dx10_code[arr_index]
+				DX_PP = dx9_code[arr_index]
 		endselect
 	else
 		$clear(DX_PP)
@@ -208,7 +208,7 @@ arr_index = $find("IP",dx_cat[],,"F")
 			case "10"
 				DX_IP = dx10_code[arr_index]
 			case "9"
-				DX_IP = dx10_code[arr_index]
+				DX_IP = dx9_code[arr_index]
 		endselect
 	else
 		$clear(DX_IP)
@@ -222,7 +222,7 @@ arr_index = $find("SA",dx_cat[],,"F")
 			case "10"
 				DX_SA = dx10_code[arr_index]
 			case "9"
-				DX_SA = dx10_code[arr_index]
+				DX_SA = dx9_code[arr_index]
 		endselect
 	else
 		$clear(DX_SA)
@@ -236,7 +236,7 @@ arr_index = $find("ID",dx_cat[],,"F")
 			case "10"
 				DX_ID = dx10_code[arr_index]
 			case "9"
-				DX_ID = dx10_code[arr_index]
+				DX_ID = dx9_code[arr_index]
 		endselect
 	else
 		$clear(DX_ID)
@@ -250,7 +250,7 @@ arr_index = $find("PH",dx_cat[],,"F")
 			case "10"
 				DX_PH = dx10_code[arr_index]
 			case "9"
-				DX_PH = dx10_code[arr_index]
+				DX_PH = dx9_code[arr_index]
 		endselect
 	else
 		$clear(DX_PH)
@@ -350,4 +350,5 @@ Select rtdxtype
 endselect
 
 end GETDXFROM9
+
 
