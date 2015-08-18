@@ -1,5 +1,5 @@
 start ANSIDX10(ansival,ansirec,ansifld,ansitest,ansicl,ansicon,ansiprov)
- %VERSION 0.2.000 08/14/2015
+ %VERSION 0.3.000 08/18/2015
  'Author:  R. Whaite, Helen Farbaee Centers
  
 'Changes:
@@ -8,6 +8,15 @@ start ANSIDX10(ansival,ansirec,ansifld,ansitest,ansicl,ansicon,ansiprov)
 '             from the event in Record Type 102 Field 013.
 
 '	R. Whaite:  8/17/2015 Added GETDXFROM9 function to get ICD-9 DX Information from the DXM IV Record.  Note, this MUST be modified for each Center.
+
+
+'Modified:  Ralph Whaite, 8/18/2015
+'		Added an option flag "dofield013".  Setting this option flag to "Y" prepend the string "ICD10:" to the DX code when the 
+'		code set version is ICD-10.  This value will rely on the AnsiWrap script to indicate ABK when the code set is ICD10.
+'		This will be most helpful for those who's ANSIP CMHC program is not up to current patch level with this functionality built in.
+'		This process in AnsiWrap uses sed to replace a specific text string "BK:ICD10:" with "ABK:".
+'		This requires that the same flag "dofield013" be set in the AnsiWrap script since this will 
+'		apply the necessary logic to create the string "BK:ICD10:" when sending the ICD-10 code.
 
  'Dependencies
  
@@ -26,7 +35,8 @@ start ANSIDX10(ansival,ansirec,ansifld,ansitest,ansicl,ansicon,ansiprov)
  '2.	**DONE** Customize function GETDXFROM9 for your Centers DST's, DCT's and or DB
  '
  '3.	Get Tim to put his GetOption and GetParm stuff in here so we can drive more stuff from a parm.  Then I can add it to an include ;-)
-
+ 
+ '4.	Move functions icd10recavail and GETDXFROM10 to the lib_DX10 function library
 
  
 %include inc_DX10
@@ -47,20 +57,22 @@ ansiprov is x
 
 |         is x   | = "|"
 ansiorig  is x
-logfile   is x  logfile = "/c4/EXPORT2/trace/ANSIDX10.LOG"
-logstring is x
-$trace("path", "/c4/EXPORT2/trace/ANSIDX10.TXT")
-$trace("on")
+'logfile   is x  logfile = "/c4/EXPORT2/trace/ANSIDX10.LOG"
+'logstring is x
+'$trace("path", "/c4/EXPORT2/trace/ANSIDX10.TXT")
+'$trace("on")
 
 'Processing Vars
 rc       is b
 '***************************************************************************************************************************
-dx10date is d dx10date = 10/01/2015		'*******Change to 10/01/2015 for production.  Any other date is ONLY for testing******.
+dx10date is d dx10date = 08/01/2015		'*******Change to 10/01/2015 for production.  Any other date is ONLY for testing******.
 '***************************************************************************************************************************
 rtdxtype	is x
 icd_ver	  is x
 usedx     is x
 rurecode  is x  rurecode = "RU2DXTYP"  'Change to match your RU to DX Type Recode
+
+dofield013 is x  dofield013 = "Y"
 
 'ISN DST's & Vars
 $$isn.id			is x	
@@ -112,15 +124,19 @@ rc = $dbread(09,ansiorig,$$isn.clid,$$isn.dt,$$isn.sac,$$isn.ru,$$isn.fs)
 			usedx = getDXfrom9($$isn.clid,icd_ver,rtdxtype)							'Still need to build getDXfrom9 function
 		endif
 
-	ansival = usedx
+	if dofield013 = "Y" and icd_ver = "10"
+		ansival = "ICD10:" + usedx
+	else 
+		ansival = usedx
+	endif
 	
 	endif
 endif
 
-logstring = "ENTITY" + | + rc + | + ansiorig + | + ansirec + | + ansifld + | + ansicl + | + ansicon + | + ansival
+'logstring = "ENTITY" + | + rc + | + ansiorig + | + ansirec + | + ansifld + | + ansicl + | + ansicon + | + ansival
 
-$log(logstring,logfile)
-$trace("off")
+'$log(logstring,logfile)
+'$trace("off")
 end ANSIDX10
 
 function icd10recavail(cid) is x
