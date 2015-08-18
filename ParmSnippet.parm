@@ -1,0 +1,17 @@
+
+*If your ANSP program is current and the dofield013 in BOTH of the AnsiWrap and the ANSIDX10 scripts is set to "N"
+
+*Health Care Diagnosis Code - Loop 2300 (Optional)                              
+*Code Set ID will be BK for ICD-9 and ABK for ICD-10
+*Note DST 7100 is the ISN Register ID associated with the Event.
+102 013 07100                                        US=ANSIDX10 Code Set ID
+102 001 07100                                        US=ANSIDX10 DX Code        
+
+
+*If your ANSP program is NOT current and the dofield013 in BOTH of the AnsiWrap and the ANSIDX10 scripts is set to "Y"
+
+*Health Care Diagnosis Code - Loop 2300 (Optional)                              
+*Code Set is defaulted to "BK".  ANSIDX10 Script and AnsiWrap script will work together to apply the BK and ABK Logic.
+*Note DST 7100 is the ISN Register ID associated with the Event.
+102 001 07100                                        US=ANSIDX10 DX Code        
+
