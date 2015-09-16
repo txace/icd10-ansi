@@ -1,22 +1,8 @@
 start AnsiWrap()
- %VERSION 0.3.000 08/18/2015
+ %VERSION 1.0.000 09/16/2015
 'Author:  R. Whaite, Helen Farabee Centers
 'Create Date:  8/16/2011
 '
-'Modified:  Bob Bell, 8/18/2011
-'		Misc stuff to make it run better and to not have to assign values to as many variables.  the idea was to 
-'		eventually make this as portable as possible.
-'
-'Modified:  Ralph Whaite, 8/17/2015
-'		Removed checking for the value of "*VERSION" in the parm file to determine 5010 or 4010.  In 2015, everything is 5010
-
-'Modified:  Ralph Whaite, 8/18/2015
-'		Added an option flag "dofield013".  Setting this option flag to "Y" will cause the script to run a process after the ANSI
-'		file is created to replace the BK with ABK as the code set identifier for ICD-10.  This will be most helpful for those who's
-'		ANSIP CMHC program is not up to current patch level with this functionality built in.  This process uses sed to replace a specific 
-'		text string "BK:ICD10:" with "ABK:".  This requires that the same flag "dofield013" be set in the ANSIDX10 script since this will 
-'		apply the necessary logic to create the string "BK:ICD10:" when sending the ICD-10 code.
-
 'This script will check to make sure specific bill files are not present before allowing the billing process
 'for a particular fund sournce to be run.  This will prevent a subsequently run billing process from replacing
 'a production bill file with another file of the same name before the file has been submitted and archived.
@@ -29,6 +15,9 @@ start AnsiWrap()
 'Lastly, if any special file edits need to be completed on the file before submission (ie: Texas LTC TypeAB KX Modifer)
 'A UNIX Command can be defined that will make those changes to the file.  Otherwise, do not set a value for the 
 'variable "FixCMD"
+
+'When adding this script to a menu.  466 is the program number, enter this script name "AnsiWrap()" in the parameter feild 
+'and enter the bill parm name in the Add Parm 1 field. 
 
 '$trace("path","/c4/EXPORT2/trace/AnsiWrap.txt")
 '$trace("on")
@@ -47,14 +36,9 @@ FileCreateTM is t
 FileOwner	   is x
 BillParm	   is x
 FixCMD		   is x	'Unix command for fixing output file
-Version		   is x	'5010 or 4010
 ParmArray[]	 is x	'Array for building a parameter file
 VerParm		   is x	'Parameter file name
 bill_parm    is x  'Billing Parm file to use selected from either $adparm1 or $adparm2
-tempfile		 is x  'Temporary file for the FixCmd
-dofield013	 is x  'Flag to turn on using Field Record 102 Field 113.
-
-dofield013	 = "Y"
 
 'Check to make sure the Add Parm 1 menu item has something there.  If not, give the error message and terminate the script.
 if $adparm1  !DP
@@ -102,11 +86,11 @@ if rc = 0                 'If the file already exists, issue the error message a
 	$disp(`"File Owner: " + FileOwner`, 12, 5,,"H")
 	$disp("Print this Screen and Contact MIS", 19, 5,,"H")
 	$acpt()
-                
-                'If the billfile is not there, go ahead and dynamically create the bill parm that tells the process to run as
-                '5010 or 4010
+	return
+endif                
 
-elseif rc = 1
+'If the billfile is not there, go ahead and dynamically create the bill parm that tells the process to run as
+'5010 or 4010
 
 		ParmArray[1] = "NSA837P5"
 		ParmArray[2] = "NSA837P5PARM " + bill_parm
@@ -115,20 +99,11 @@ elseif rc = 1
 	rc = $putparm(ParmArray[],VerParm,"R")
 
 	CreateBill = $misprog(474,VerParm)
-	if CreateBill = 0 then
-
-	rc = $tempfile(tempfile)
-	FixCmd = "sed 's/BK:ICD10:/ABK:/g' " + Filename + " > " + tempfile + " ; cp " + tempfile + " " + Filename
-
-		' Have a post fix command to run
-		if FixCMD DP then
-			if dofield013 = "Y"
-			  rc = $unix(FixCmd)			
-			endif
-		endif
-	else
+'	CreateBill = $misprog(474,bill_parm)
+	
 		' Show a error message
 		select CreateBill
+		  case 0  goto EndScript
 		  case 1	$errmsg1 = "The mis-prog-ref isn't in the program control file"
 		  case 2	$errmsg1 = "Operator isn't authorized to initiate this program"
 		  case 3 	$errmsg1 = "This function isn't permitted if $sessiontabs is active"
@@ -142,9 +117,8 @@ elseif rc = 1
 		  case 11	$errmsg1 = "More than one left-frame menu referenced"
 		  case other	$errmsg1 = $format(rc, "Unknown error (99)")
 		endselect
-	endif
-endif
 
+EndScript:
 end AnsiWrap
 
 function ShowMessageWin(msg1, msg2, msg3, msg4) is null
@@ -165,4 +139,3 @@ $disp(msg3, 10, 6,,"H")
 $disp(msg4, 11, 6,,"H")
 $acpt()
 end ShowMessageWin
-

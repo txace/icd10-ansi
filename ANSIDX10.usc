@@ -1,5 +1,5 @@
 start ANSIDX10(ansival,ansirec,ansifld,ansitest,ansicl,ansicon,ansiprov)
- %VERSION 0.3.000 08/18/2015
+ %VERSION 1.1.000 09/16/2015
  'Author:  R. Whaite, Helen Farbaee Centers
  
 'Changes:
@@ -8,15 +8,8 @@ start ANSIDX10(ansival,ansirec,ansifld,ansitest,ansicl,ansicon,ansiprov)
 '             from the event in Record Type 102 Field 013.
 
 '	R. Whaite:  8/17/2015 Added GETDXFROM9 function to get ICD-9 DX Information from the DXM IV Record.  Note, this MUST be modified for each Center.
-
-
-'Modified:  Ralph Whaite, 8/18/2015
-'		Added an option flag "dofield013".  Setting this option flag to "Y" prepend the string "ICD10:" to the DX code when the 
-'		code set version is ICD-10.  This value will rely on the AnsiWrap script to indicate ABK when the code set is ICD10.
-'		This will be most helpful for those who's ANSIP CMHC program is not up to current patch level with this functionality built in.
-'		This process in AnsiWrap uses sed to replace a specific text string "BK:ICD10:" with "ABK:".
-'		This requires that the same flag "dofield013" be set in the AnsiWrap script since this will 
-'		apply the necessary logic to create the string "BK:ICD10:" when sending the ICD-10 code.
+'							However, if this script is used post conversion, The Get DX from 9 function will likely not be needed.  After 10/1/2015, this functionality
+'							will likely be removed.
 
  'Dependencies
  
@@ -27,18 +20,20 @@ start ANSIDX10(ansival,ansirec,ansifld,ansitest,ansicl,ansicon,ansiprov)
  '2.	Libraries and Functions
  '		a.	the GetClientDX function lib_DX10 is used and returns arrays containing the dx_type, icd9_code, icd10_code
  
+ '3.	Bill Parm Requirements and Examples.
+ '		a.	Record 102 and Field 001 and 013 must BOTH reference the ISN ID DST (7100) and have US=ANSIDX10 beginning in postion 54
+ '		b.	Examples of Record 102 Fields 001 and 013 are below. 
+ 
+'102 013 07100                                        US=ANSIDX10 DX Codeset
+'102 001 07100                                        US=ANSIDX10 DX Code        
+ 
  'ToDo:
  
  '1.	Do we want to provide options for recoding event FS and event SAC to MH, SA or IDD?  Should be easy enough to do if 
- '    this functinality is desied.
- '
- '2.	**DONE** Customize function GETDXFROM9 for your Centers DST's, DCT's and or DB
- '
- '3.	Get Tim to put his GetOption and GetParm stuff in here so we can drive more stuff from a parm.  Then I can add it to an include ;-)
- 
- '4.	Move functions icd10recavail and GETDXFROM10 to the lib_DX10 function library
+ '    this functinality is desired.
 
- 
+ '2.	Each Center MUST Customize function GETDXFROM9 for your Centers DST's, DCT's and or DB
+
 %include inc_DX10
 
 'ANSIP Vars
@@ -50,29 +45,35 @@ ansicl   is x
 ansicon  is x
 ansiprov is x
 
-'Logging and Trace - Typically needed for testing.  Comment out if no longer needed.  Filesystem location and filename will need to be
+'Logging and Trace - Typically needed for testing.  Comment out the lines setting the value for logfile and/or tracefile when no longer needed.  
+'								Filesystem location and filename will need to be
 '               Specific per Center.  Note, for tracing to provide useful feedback while testing, the ANSI process should only be 
 '								run for one client and one event at a time.  Otherwise the trace file keeps over-writing itself.  However, the 
 '								logfile will record the action on each event put into the ANSI Process
 
 |         is x   | = "|"
 ansiorig  is x
-'logfile   is x  logfile = "/c4/EXPORT2/trace/ANSIDX10.LOG"
-'logstring is x
-'$trace("path", "/c4/EXPORT2/trace/ANSIDX10.TXT")
-'$trace("on")
+
+logfile   is x  
+logstring is x
+'logfile = "/c4/EXPORT2/whaiter/ANSIDX10.LOG"
+
+tracefile is x
+'tracefile = "/c4/EXPORT2/whaiter/ANSIDX10.TXT"
+
+if tracefile dp
+	$trace("path.on", tracefile)
+endif
 
 'Processing Vars
 rc       is b
 '***************************************************************************************************************************
-dx10date is d dx10date = 08/01/2015		'*******Change to 10/01/2015 for production.  Any other date is ONLY for testing******.
+dx10date is d dx10date = 10/01/2015		'*******Change to 10/01/2015 for production.  Any other date is ONLY for testing******.
 '***************************************************************************************************************************
 rtdxtype	is x
 icd_ver	  is x
 usedx     is x
 rurecode  is x  rurecode = "RU2DXTYP"  'Change to match your RU to DX Type Recode
-
-dofield013 is x  dofield013 = "Y"
 
 'ISN DST's & Vars
 $$isn.id			is x	
@@ -81,9 +82,6 @@ $$isn.dt			is d
 $$isn.sac			is b
 $$isn.ru			is b
 $$isn.fs			is b
-
-'Client DST's & Vars
-
 
 ansiorig = ansival			'Grab the original ansival value and keep it for comparison purposes.  Should be the ISN ID for the event
 
@@ -97,8 +95,6 @@ if    ansirec = "102" and (ansifld = "001" or ansifld = "013")
 rc = $dbread(09,ansiorig,$$isn.clid,$$isn.dt,$$isn.sac,$$isn.ru,$$isn.fs)
 
 	rtdxtype = $rt($$isn.ru,rurecode,"R")					'Get the DX Type (MH, IDD, SA) by looking by recoding event RU
-
-'	icd10recavail($$isn.clid)													'Is there an ICD-10 Record Available"
 
 	if $$isn.dt < dx10date													'Determine if where we should get the DX (ICD-9 or ICD-10 record and if we should return
 		icd_ver = "9"																'the ICD-9 value (before ICD-10 date) or the ICD-10 Value
@@ -121,22 +117,19 @@ rc = $dbread(09,ansiorig,$$isn.clid,$$isn.dt,$$isn.sac,$$isn.ru,$$isn.fs)
 		elseif 	{"lib_DX10"}icd10recavail($$isn.clid) = "Y" and icd_ver = "9"
 			usedx = {"lib_DX10"}getDXfrom10($$isn.clid,icd_ver,rtdxtype)
 		elseif 	{"lib_DX10"}icd10recavail($$isn.clid) = "N" and icd_ver = "9"
-			usedx = getDXfrom9($$isn.clid,icd_ver,rtdxtype)							'Still need to build getDXfrom9 function
+			usedx = getDXfrom9($$isn.clid,icd_ver,rtdxtype)							
 		endif
 
-	if dofield013 = "Y" and icd_ver = "10"
-		ansival = "ICD10:" + usedx
-	else 
 		ansival = usedx
-	endif
 	
 	endif
 endif
 
-'logstring = "ENTITY" + | + rc + | + ansiorig + | + ansirec + | + ansifld + | + ansicl + | + ansicon + | + ansival
+if logfile dp
+	logstring = "ENTITY" + | + rc + | + ansiorig + | + ansirec + | + ansifld + | + ansicl + | + ansicon + | + ansival
+	$log(logstring,logfile)
+endif
 
-'$log(logstring,logfile)
-'$trace("off")
 end ANSIDX10
 
 
