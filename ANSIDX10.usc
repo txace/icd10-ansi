@@ -1,15 +1,11 @@
 start ANSIDX10(ansival,ansirec,ansifld,ansitest,ansicl,ansicon,ansiprov)
- %VERSION 1.1.000 09/16/2015
+ %VERSION 1.0.000 09/17/2015
  'Author:  R. Whaite, Helen Farbaee Centers
  
 'Changes:
 
 '	R. Whaite:  8/14/2015 Added logic to return BK (ICD-9) or ABK (ICD-10) as the code list qualifier.  Parm file needs to provide the ISN-ID (7100)
 '             from the event in Record Type 102 Field 013.
-
-'	R. Whaite:  8/17/2015 Added GETDXFROM9 function to get ICD-9 DX Information from the DXM IV Record.  Note, this MUST be modified for each Center.
-'							However, if this script is used post conversion, The Get DX from 9 function will likely not be needed.  After 10/1/2015, this functionality
-'							will likely be removed.
 
  'Dependencies
  
@@ -31,8 +27,6 @@ start ANSIDX10(ansival,ansirec,ansifld,ansitest,ansicl,ansicon,ansiprov)
  
  '1.	Do we want to provide options for recoding event FS and event SAC to MH, SA or IDD?  Should be easy enough to do if 
  '    this functinality is desired.
-
- '2.	Each Center MUST Customize function GETDXFROM9 for your Centers DST's, DCT's and or DB
 
 %include inc_DX10
 
@@ -116,8 +110,8 @@ rc = $dbread(09,ansiorig,$$isn.clid,$$isn.dt,$$isn.sac,$$isn.ru,$$isn.fs)
 			usedx = {"lib_DX10"}getDXfrom10($$isn.clid,icd_ver,rtdxtype)
 		elseif 	{"lib_DX10"}icd10recavail($$isn.clid) = "Y" and icd_ver = "9"
 			usedx = {"lib_DX10"}getDXfrom10($$isn.clid,icd_ver,rtdxtype)
-		elseif 	{"lib_DX10"}icd10recavail($$isn.clid) = "N" and icd_ver = "9"
-			usedx = getDXfrom9($$isn.clid,icd_ver,rtdxtype)							
+		else
+			usedx = "R69"
 		endif
 
 		ansival = usedx
@@ -132,64 +126,4 @@ endif
 
 end ANSIDX10
 
-
-function GETDXFROM9(cid,icd_ver,rtdxtype) is x
-
-'******************************************************
-'*                                                    *
-'*     This Function is Very Center Specific          *
-'*                                                    *
-'******************************************************
-rc					 is i
-cid          is x
-rtdxtype     is x
-icd_ver			 is x
-
-c.dsmiiir		 is h
-c.diag			 is x		'Axis I Level 1
-c.dxaxi2		 is x 	'Axis I Level 2
-c.dxaxi3		 is x		'Axis I Level 3
-c.dxaxii1		 is x		'Axis II Level 1
-c.dxaxii2		 is x		'Axis II Level 2
-
-rc = $dbread(2,cid, c.dsmiiir, c.diag, c.dxaxi2, c.dxaxi3,c.dxaxii1,c.dxaxii2)
-
-Select rtdxtype
-	Case "MH"
-	
-	'First try to find a Target Pop DX
-	if 		   $rt(400,c.diag,"1") = "B" or $rt(400,c.diag,"1") = "S" or $rt(400,c.diag,"1") = "D"
-		   GETDXFROM9 = c.diag
-	elseif   $rt(400,c.dxaxi2,"1") = "B" or $rt(400,c.dxaxi2,"1") = "S" or $rt(400,c.dxaxi2,"1") = "D"
-		   GETDXFROM9 = c.dxaxi2
-	elseif 	 $rt(400,c.dxaxi3,"1") = "B" or $rt(400,c.dxaxi3,"1") = "S" or $rt(400,c.dxaxi3,"1") = "D"
-		   GETDXFROM9 = c.dxaxi3
-	'Next try to find Other DX besides SA		
-	elseif $rt(400,c.diag,"1") = "O" and $rt(400,c.diag,"3") != "SA"
-		   GETDXFROM9 = c.diag
-	elseif $rt(400,c.dxaxi2,"1") = "O" and $rt(400,c.dxaxi2,"3") != "SA"
-		   GETDXFROM9 = c.dxaxi2
-  elseif $rt(400,c.dxaxi3,"1") = "O" and $rt(400,c.dxaxi3,"3") != "SA"
-		   GETDXFROM9 = c.dxaxi3
-	'If nothing there, send the V71.09
-	else
-			 GETDXFROM9 = "V71.09"
-	endif	
-		
-	Case "SA"
-
-	if 		 $rt(400,c.diag,"3") = "SA"
-		   GETDXFROM9 = c.diag
-	elseif $rt(400,c.dxaxi2,"3") = "SA"
-		   GETDXFROM9 = c.dxaxi2
-	elseif $rt(400,c.dxaxi3,"3") = "SA"
-		   GETDXFROM9 = c.dxaxi3
-	endif
-		
-	Case "IDD"
-			 GETDXFROM9 = c.dxaxii1
-	
-endselect
-
-end GETDXFROM9
 
