@@ -1,11 +1,14 @@
 start ANSIDX10(ansival,ansirec,ansifld,ansitest,ansicl,ansicon,ansiprov)
- %VERSION 1.0.000 09/17/2015
+ %VERSION 1.1.100 09/18/2015
  'Author:  R. Whaite, Helen Farbaee Centers
  
 'Changes:
 
 '	R. Whaite:  8/14/2015 Added logic to return BK (ICD-9) or ABK (ICD-10) as the code list qualifier.  Parm file needs to provide the ISN-ID (7100)
 '             from the event in Record Type 102 Field 013.
+'
+' R. Whaite:  9/18/2015 Removed any checking for the availability of data in the ICD-10 Record.  All Centers will need to be converted by 10/1/2015.
+'                        Lack of data in the ICD-10 record will indciate no DX on file.  Same as if no DX information is in the ICD-9 Record.
 
  'Dependencies
  
@@ -103,19 +106,9 @@ rc = $dbread(09,ansiorig,$$isn.clid,$$isn.dt,$$isn.sac,$$isn.ru,$$isn.fs)
 			case "10" 
 				ansival = "ABK"
 		endselect	
-	
-	else
-
-		if 			icd_ver = "10"
+	elseif ansifld = "001"
 			usedx = {"lib_DX10"}getDXfrom10($$isn.clid,icd_ver,rtdxtype)
-		elseif 	{"lib_DX10"}icd10recavail($$isn.clid) = "Y" and icd_ver = "9"
-			usedx = {"lib_DX10"}getDXfrom10($$isn.clid,icd_ver,rtdxtype)
-		else
-			usedx = "R69"
-		endif
-
-		ansival = usedx
-	
+			ansival = usedx
 	endif
 endif
 
@@ -125,5 +118,4 @@ if logfile dp
 endif
 
 end ANSIDX10
-
 
