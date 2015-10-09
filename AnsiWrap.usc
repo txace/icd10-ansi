@@ -94,11 +94,11 @@ if bill-parm !DP and promptforparm = "Y" then
 endif
 
 ' panic if we still don't have a bill parm
-'if nsa837p5parm !dp and requirebillparm != "N" then
-   'ShowMessageWin("Billing Parm File Not Specified",,"Print this Screen and Contact MIS")
-   'retcode = 98
-   'return
-'endif
+if bill-parm !dp then
+   ShowMessageWin("Billing Parm File Not Specified",,"Print this Screen and Contact MIS")
+   retcode = 98
+   return
+endif
 
 'check the billing parm file for the parameter "SEQOUT", if it is present, put the value into the CheckFile variable.
 'We should probably do some error checking to handle situations when the SEQOUT parmaeter is not present.  If this is the case, 
@@ -108,14 +108,6 @@ if $getparm(,bill-parm, "SEQOUT", CheckFile) >= 2 then
    ShowMessageWin("SEQOUT Parm Not in Parmfile",,"Print this Screen and Contact MIS")
    return
 endif
-
-' Use the filename from the parameter file if not overritten in this script.
-'if CheckFile DP and FileName !DP then
-   'FileName = CheckFile
-'else
-   'CheckFile = FileName
-   'FileName = FilePath + FileName
-'endif
 
 'Check to see if the file is there.  If it is, give the error message and terminate the script.
 'If it is not, allow the 837P proess to continue with the parm in Add Parm 1.
@@ -137,15 +129,13 @@ if rc = 0                 'If the file already exists, issue the error message a
    return
 endif                
 
-'If the billfile is not there, go ahead and dynamically create the bill parm that tells the process to run as
-'5010 or 4010
-
 'process the prescripts
 rc = 0
 do while rc++ < $maxarray(prescript[])
    call prescript[rc] (parmfile, option, checkfile, retcode)
 enddo
 
+'dynamically create the bill parm that tells the process to run as 5010 if we don't have a NSA parameter
 verparm = parmfile
 if nsa837p5parm !dp then
    ParmArray[1] = "NSA837P5"
@@ -155,7 +145,6 @@ if nsa837p5parm !dp then
 endif
 
 CreateBill = $misprog(474,VerParm)
-'createbill = $misprog(474, parmfile)
 
 if createbill > 0 then
    $errmsg1 = misprogerr[rc]
