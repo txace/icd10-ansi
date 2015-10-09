@@ -38,14 +38,38 @@ FixCMD         is x   'Unix command for fixing output file
 Version        is x   '5010 or 4010
 ParmArray[]    is x   'Array for building a parameter file
 VerParm        is x   'Parameter file name
-bill_parm      is x   'Billing Parm file to use selected from either $adparm1 or $adparm2
-tempfile       is x   'Temporary file for the FixCmd
 
+nsa837p5       is x
+nsa837p5parm   is x
+
+misprogerr[]   is x
+
+bill-parm      is x   'Billing Parm file to use selected from either $adparm1 or $adparm2
+tempfile       is x   'Temporary file for the FixCmd
 tracepath      is x
+
 promptforparm  is x
+requirebillparm   is x
+
+prescript[]    is x
+postscript[]   is x
 
 'Default the bill_parm to the $adparm from the menu
-bill_parm = $adparm1
+nsa837p5 = "Y"
+'nsa837p5parm = $adparm1
+bill-parm = $adparm1
+
+misprogerr[1 ] = "The mis-prog-ref isn't in the program control file"
+misprogerr[2 ] = "Operator isn't authorized to initiate this program"
+misprogerr[3 ] = "This function isn't permitted if $sessiontabs is active"
+misprogerr[4 ] = "The program attempted is not allowed in $misprog (e.g. menu)"
+misprogerr[5 ] = "$misprog cannot be executed while $setmis is in effect"
+misprogerr[6 ] = "Program is browser only and session is in character mode"
+misprogerr[7 ] = "Program is non-browser mode and session is in browser mode"
+misprogerr[8 ] = "Error bidding the CMHC/MIS program"
+misprogerr[9 ] = "Program control file error"
+misprogerr[10] = "The session is a CRON, but the requested CMHC/MIS program cannot be run in CRON mode"
+misprogerr[11] = "More than one left-frame menu referenced"
 
 getparm(parmfile)
 getoption(option)
@@ -54,38 +78,49 @@ if tracepath dp then
    $trace("on,path", tracepath)
 endif
 
-' if we don't have a bill parm ask for one if the config says it's ok to ask
-if bill_parm !DP and promptforparm = "Y" then
-   bill_parm = askforparm()
+if nsa837p5parm dp then
+   bill-parm = nsa837p5parm
+endif
+
+'' if we don't have a bill parm ask for one if the config says it's ok to ask
+if bill-parm !DP and promptforparm = "Y" then
+      $openwin(win1, 5, 25, 4, 64)
+      $disp("Billing Parm:", 6, 5,,"H")
+      $acpt(bill-parm, 6, 20, 8)
+      if bill-parm !dp then 
+         retcode = 98
+         return
+      endif
 endif
 
 ' panic if we still don't have a bill parm
-if bill_parm !dp then
-   ShowMessageWin("Billing Parm File Not Specified",,"Print this Screen and Contact MIS")
-   return
-endif
+'if nsa837p5parm !dp and requirebillparm != "N" then
+   'ShowMessageWin("Billing Parm File Not Specified",,"Print this Screen and Contact MIS")
+   'retcode = 98
+   'return
+'endif
 
 'check the billing parm file for the parameter "SEQOUT", if it is present, put the value into the CheckFile variable.
 'We should probably do some error checking to handle situations when the SEQOUT parmaeter is not present.  If this is the case, 
 'The process should notify the user and then abort (return).
 
-if $getparm(,bill_parm, "SEQOUT", CheckFile) >= 2 then
+if $getparm(,bill-parm, "SEQOUT", CheckFile) >= 2 then
    ShowMessageWin("SEQOUT Parm Not in Parmfile",,"Print this Screen and Contact MIS")
    return
 endif
 
 ' Use the filename from the parameter file if not overritten in this script.
-if CheckFile DP and FileName !DP then
-   FileName = CheckFile
-else
-   CheckFile = FileName
-   FileName = FilePath + FileName
-endif
+'if CheckFile DP and FileName !DP then
+   'FileName = CheckFile
+'else
+   'CheckFile = FileName
+   'FileName = FilePath + FileName
+'endif
 
 'Check to see if the file is there.  If it is, give the error message and terminate the script.
 'If it is not, allow the 837P proess to continue with the parm in Add Parm 1.
 
-rc = $checkfile(FileName,FileSize,FileCreateDT,FileCreateTM,,,FileOwner)
+rc = $checkfile(CheckFile,FileSize,FileCreateDT,FileCreateTM,,,FileOwner)
 
 if rc = 0                 'If the file already exists, issue the error message and instructions to the user
    $openwin(win1, 5, 25, 4, 64)
@@ -98,51 +133,49 @@ if rc = 0                 'If the file already exists, issue the error message a
    $disp(`"File Owner: " + FileOwner`, 12, 5,,"H")
    $disp("Print this Screen and Contact MIS", 19, 5,,"H")
    $acpt()
-	return
+   retcode = 99
+   return
 endif                
 
 'If the billfile is not there, go ahead and dynamically create the bill parm that tells the process to run as
 '5010 or 4010
 
+'process the prescripts
+rc = 0
+do while rc++ < $maxarray(prescript[])
+   call prescript[rc] (parmfile, option, checkfile, retcode)
+enddo
+
+verparm = parmfile
+if nsa837p5parm !dp then
    ParmArray[1] = "NSA837P5"
-   ParmArray[2] = "NSA837P5PARM " + bill_parm
+   ParmArray[2] = "NSA837P5PARM " + bill-parm
    VerParm = "VP5010"
-
    rc = $putparm(ParmArray[],VerParm,"R")
-
-   CreateBill = $misprog(474,VerParm)
-   if CreateBill = 0 then
-
-      rc = $tempfile(tempfile)
-      FixCmd = "sed 's/BK:ICD10:/ABK:/g' " + Filename + " > " + tempfile + " ; cp " + tempfile + " " + Filename
-
-      ' Have a post fix command to run
-      if FixCMD DP then
-         if dofield013 = "Y"
-            rc = $unix(FixCmd)         
-         endif
-      endif
-   else
-      ' Show a error message
-      select CreateBill
-         case 1         $errmsg1 = "The mis-prog-ref isn't in the program control file"
-         case 2         $errmsg1 = "Operator isn't authorized to initiate this program"
-         case 3         $errmsg1 = "This function isn't permitted if $sessiontabs is active"
-         case 4         $errmsg1 = "The program attempted is not allowed in $misprog (e.g. menu)"
-         case 5         $errmsg1 = "$misprog cannot be executed while $setmis is in effect"
-         case 6         $errmsg1 = "Program is browser only and session is in character mode"
-         case 7         $errmsg1 = "Program is non-browser mode and session is in browser mode"
-         case 8         $errmsg1 = "Error bidding the CMHC/MIS program"
-         case 9         $errmsg1 = "Program control file error"
-         case 10        $errmsg1 = "The session is a CRON, but the requested CMHC/MIS program cannot be run in CRON mode"
-         case 11        $errmsg1 = "More than one left-frame menu referenced"
-         case other     $errmsg1 = $format(rc, "Unknown error (99)")
-      endselect
-   endif
 endif
 
-EndScript:
+CreateBill = $misprog(474,VerParm)
+'createbill = $misprog(474, parmfile)
+
+if createbill > 0 then
+   $errmsg1 = misprogerr[rc]
+   if $errmsg1 !dp then
+      $errmsg1 = $format(rc, "Unknown error (99)")
+   endif
+   retcode = rc
+   return
+endif
+
+'process the postscripts
+rc = 0
+do while rc++ < $maxarray(postscript[])
+   call postscript[rc] (parmfile, option, checkfile, retcode)
+enddo
+
 end AnsiWrap
+
+%include inc_GetParm
+%include inc_GetOption
 
 function ShowMessageWin(msg1, msg2, msg3, msg4) is null
 '--- function arguments ---
