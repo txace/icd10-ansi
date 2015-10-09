@@ -1,5 +1,5 @@
-start AnsiWrap()
- %VERSION 1.0.000 09/16/2015
+start AnsiWrap(parmfile, option, retcode)
+ %VERSION 0.4.000 10/08/2015
 'Author:  R. Whaite, Helen Farabee Centers
 'Create Date:  8/16/2011
 '
@@ -16,13 +16,12 @@ start AnsiWrap()
 'A UNIX Command can be defined that will make those changes to the file.  Otherwise, do not set a value for the 
 'variable "FixCMD"
 
-'When adding this script to a menu.  466 is the program number, enter this script name "AnsiWrap()" in the parameter feild 
-'and enter the bill parm name in the Add Parm 1 field. 
-
-'$trace("path","/c4/EXPORT2/trace/AnsiWrap.txt")
-'$trace("on")
-
 'Define the parameters we'll need.
+parmfile       is x
+option         is x
+retcode        is b
+
+$allowupdate(retcode)
 
 win1           is b   'Window Handle number
 rc             is i   'Function return codes
@@ -41,26 +40,36 @@ ParmArray[]    is x   'Array for building a parameter file
 VerParm        is x   'Parameter file name
 bill_parm      is x   'Billing Parm file to use selected from either $adparm1 or $adparm2
 tempfile       is x   'Temporary file for the FixCmd
-dofield013     is x   'Flag to turn on using Field Record 102 Field 113.
 
-'Check to make sure the Add Parm 1 menu item has something there.  If not, give the error message and terminate the script.
-if $adparm1  !DP
-   ShowMessageWin("Please Add Billing Parm File to Add Parm 1",,"Print this Screen and Contact MIS")
-   return
+tracepath      is x
+promptforparm  is x
+
+'Default the bill_parm to the $adparm from the menu
+bill_parm = $adparm1
+
+getparm(parmfile)
+getoption(option)
+
+if tracepath dp then
+   $trace("on,path", tracepath)
 endif
 
-'Check that the Add Parm 1 value is something we expect.  If not, give the error message and terminate the script.
-'This section also uses the Parm 1 value to determine the expected file name and the expected path
+' if we don't have a bill parm ask for one if the config says it's ok to ask
+if bill_parm !DP and promptforparm = "Y" then
+   bill_parm = askforparm()
+endif
 
-bill_parm = $adparm1
+' panic if we still don't have a bill parm
+if bill_parm !dp then
+   ShowMessageWin("Billing Parm File Not Specified",,"Print this Screen and Contact MIS")
+   return
+endif
 
 'check the billing parm file for the parameter "SEQOUT", if it is present, put the value into the CheckFile variable.
 'We should probably do some error checking to handle situations when the SEQOUT parmaeter is not present.  If this is the case, 
 'The process should notify the user and then abort (return).
 
-rc = $getparm(,bill_parm, "SEQOUT", CheckFile)
-
-if rc >= 2
+if $getparm(,bill_parm, "SEQOUT", CheckFile) >= 2 then
    ShowMessageWin("SEQOUT Parm Not in Parmfile",,"Print this Screen and Contact MIS")
    return
 endif
