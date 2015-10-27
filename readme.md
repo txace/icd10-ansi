@@ -31,7 +31,7 @@ This uScript provides for some functionality that some users may find helpful
 
 1. It checks for a billing file of the same name and path in the UNIX filesystem that will be created by the billing process.  If the file is present, the user is presented with a file replacement error message that provides the file date, file time and file owner.  This prevents staff from inadvertently overwriting a billing file that may not yet have been sent.  See an example of this error message below.  Note, this is an error message.  Hitting any key while on this message will cause the script to stop processing and no ANSI file will be created.
 
-2. The process will create the needed “Version Parmfile” that tells the ANSI Processor that a 5010 compliant file will need to be created and provides the Billing Parmfile to the process. This process makes no provision for ANSI 4010 processing as this should no longer be needed.  Using this uScript will prevent staff from seeing the screen where they must indicate 4010 or 5010  version of the 837 file.  See example of Screen that still will NOT see below.
+2. The process will create the needed 'Version Parmfile' that tells the ANSI Processor that a 5010 compliant file will need to be created and provides the Billing Parmfile to the process. This process makes no provision for ANSI 4010 processing as this should no longer be needed.  Using this uScript will prevent staff from seeing the screen where they must indicate 4010 or 5010  version of the 837 file.  See example of Screen that still will NOT see below.
   
 ![Ansi 837 Version Prompt Screen](https://github.com/txace/txace-images/blob/master/ansi-837-version-prompt-screen.png)
 
@@ -43,8 +43,9 @@ Certain Logic will be required to send correct diagnostic information in our ANS
 
 1. Event Date: It gets this information from the ISN associated with the event.  
 
-  -.  If the ISN Event date is >= 10/1/2015 the ICD-10 Code is sent and the code set identifier of ABK is also sent.
-  -.  If the ISN Event date is < 10/1/2015, the ICD-9 code is sent and the code set identifier of BK is sent.
+  - If the ISN Event date is >= 10/1/2015 the ICD-10 Code is sent and the code set identifier of ABK is also sent.
+
+  - If the ISN Event date is < 10/1/2015, the ICD-9 code is sent and the code set identifier of BK is sent.
 
 2. Is this an MH, ID or SA Service?  The ISN RU from the ISN associated with the event is recoded into the value of MH, ID or SA.  This value is used to select the highest ranking DX code for the event that matches the DX_Category. 
 
