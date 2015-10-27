@@ -33,7 +33,7 @@ This uScript provides for some functionality that some users may find helpful
 
 2. The process will create the needed “Version Parmfile” that tells the ANSI Processor that a 5010 compliant file will need to be created and provides the Billing Parmfile to the process. This process makes no provision for ANSI 4010 processing as this should no longer be needed.  Using this uScript will prevent staff from seeing the screen where they must indicate 4010 or 5010  version of the 837 file.  See example of Screen that still will NOT see below.
   
-![Ansi 837 Version Prompt Screen](https://github.com/txace/txace-images/blob/master/ansi-837-version-prompt-screen.png')
+![Ansi 837 Version Prompt Screen](https://github.com/txace/txace-images/blob/master/ansi-837-version-prompt-screen.png)
 
 3. While these two benefits seem small, they can be a significant time saver because staff are not allowed to make certain mistakes.
 
