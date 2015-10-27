@@ -37,6 +37,15 @@ This uScript provides for some functionality that some users may find helpful
 
 3. While these two benefits seem small, they can be a significant time saver because staff are not allowed to make certain mistakes.
 
+###### AnsiWrap Parameter Options
+
+| name | Possible Values | Description |
+| ---- | --------------- | ----------- |
+| prescript-# | valid uscript name | List of uscripts you want to be executed prior to calling the 837 Program. The output sequential file is passed in as the 3rd argument of the script |
+| postscript-# | valid uscript name | List of uscripts you want to be executed after to calling the 837 Program. The output sequential file is passed in as the 3rd argument of the script |
+| nsa837p5parm | Valid 837 Billing Parm | Alternative to setting the billing parm on the menu. If this parm is set it will use this value for the Billing Parm for the 837 program |
+| promptforparm | Y or !DP | Option to turn on the character based screen for prompting the user to enter the billing parm. If promptforparm is _not_ set to 'Y' and the billing parm is not set by $adparm1 or by nsa837p5parm the script will error |
+
 ##### ANSIDX10
 
 Certain Logic will be required to send correct diagnostic information in our ANSI Billing files.  Information points that this uScript considers before determining the appropriate data to send are:
@@ -70,6 +79,8 @@ The ANSIDX10 script is called by the ANSI P program.  There are two fields that 
 2. On the Update Additional Parameters Screen, enter your Bill Parameter File name under Add Parm 1.  The example below, the bill parameter name is MCODX10
     
 ![AnsiWrap Menu Additional Parm Setup](https://github.com/txace/txace-images/blob/master/ansiwrap-menu-additional-setup.png)
+
+*NOTE* Step 2 is optional if you use either the nsa837p5parm or promptforparm options of the AnsiWrap Script.
 
 #### Tracing & Logging
 
